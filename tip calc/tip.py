@@ -1,0 +1,7 @@
+bill = input("Please provide the bill amount:")
+people = input("Please provide the number of people:")
+tip = input("Please provide tip percentage:")
+b = float(bill)
+p = int(people)
+t = float(1+int(tip)/100)
+print(f"Each person should pay {round(b/p*t,2)}")
