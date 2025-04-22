@@ -54,7 +54,7 @@ stages = ['''
       |
 =========
 ''']
-
+#  Single and double quotes are used for single-line strings, while triple quotes are used for multi-line strings and docstrings. 
 logo = ''' 
  _                                             
 | |                                            
