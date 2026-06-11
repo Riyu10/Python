@@ -1,0 +1,504 @@
+from flask import Flask,redirect, url_for,render_template,request,json
+import pandas as pd
+import numpy as np
+from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.neighbors import KNeighborsClassifier
+import requests
+import pickle
+import os.path
+from googleapiclient.discovery import build
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
+from google.oauth2 import service_account
+
+SCOPES=['https://www.googleapis.com/auth/spreadsheets']
+SERVICE_ACCOUNT_FILE='secret_key.json'
+id='17afwb2-_4pb5pchm2D7lV7c9HRoxHdXTffL7DbUv8JU'
+
+creds=service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE,scopes=SCOPES)
+# from  crop import classifier
+service=build('sheets','v4',credentials=creds)
+
+#call the Sheets Api
+sheet=service.spreadsheets()
+
+app=Flask(__name__)
+app.secret_key="Teams"
+model=pickle.load(open('model.pkl','rb'))
+@app.route("/")
+def home():
+    return render_template("index.html",cont="User")
+
+@app.route("/login",methods=['GET','POST'])
+def login():
+    if request.method=='POST':
+        N=float(request.form.get('Nitrogen'))
+        P=float(request.form.get('Phosphorous'))
+        K=float(request.form.get('Potassium'))
+        path = "https://api.thingspeak.com/channels/2110943/feeds.json?api_key=KIPMAC5HW5W2Y0SR&results=2"
+        response = requests.get(path)
+        data = response.json()
+        data_dictionary = dict(data)
+        temp = float(data_dictionary["feeds"][1]["field1"])
+        humi = float(data_dictionary["feeds"][1]["field2"])
+        ph=float(data_dictionary["feeds"][1]["field3"])
+        rainfall=float(data_dictionary["feeds"][1]["field4"])
+        # object = Crop.classifier.predict(np.array([N,P,K,humi,ph,rainfall]))
+        # model=pickle.load(open("model.pkl",'rb'))
+        data= pd.read_csv('data/Crop_recommendation.csv')
+        data['label']=LabelEncoder().fit_transform(data['label'])
+        data['label'].unique()
+        X = data.drop(['label'],axis=1)
+        Y = data.label
+        X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.20)
+        scaler = StandardScaler()
+        scaler.fit(X_train)
+
+        X_train = scaler.transform(X_train)
+        X_test = scaler.transform(X_test)
+        classifier = KNeighborsClassifier(n_neighbors=5)
+        classifier.fit(X_train, y_train)
+        data_e=[[N,P,K,temp,humi,ph,rainfall]]
+        print(data_e)
+        data_t=scaler.transform(data_e)
+        predict1=classifier.predict(data_t)
+        print(predict1)
+        if predict1==0:
+            crop_name = 'Apple(सेब)'
+        elif predict1 == 1:
+            crop_name = 'Banana(केला)'
+        elif predict1 == 2:
+            crop_name = 'Blackgram(काला चना)'
+        elif predict1 == 3:
+            crop_name = 'Chickpea(काबुली चना)'
+        elif predict1 == 4:
+            crop_name = 'Coconut(नारियल)'
+        elif predict1 == 5:
+            crop_name = 'Coffee(कॉफ़ी)'
+        elif predict1 == 6:
+            crop_name = 'Cotton(कपास)'
+        elif predict1 == 7:
+            crop_name = 'Grapes(अंगूर)'
+        elif predict1 == 8:
+            crop_name = 'Jute(जूट)'
+        elif predict1 == 9:
+            crop_name = 'Kidneybeans(राज़में)'
+        elif predict1 == 10:
+            crop_name = 'Lentil(मसूर की दाल)'
+        elif predict1 == 11:
+            crop_name = 'Maize(मक्का)'
+        elif predict1 == 12:
+            crop_name = 'Mango(आम)'
+        elif predict1 == 13:
+            crop_name = 'Mothbeans(मोठबीन)'
+        elif predict1 == 14:
+            crop_name = 'Mungbeans(मूंग)'
+        elif predict1 == 15:
+            crop_name = 'Muskmelon(खरबूजा)'
+        elif predict1 == 16:
+            crop_name = 'Orange(संतरा)'
+        elif predict1 == 17:
+            crop_name = 'Papaya(पपीता)'
+        elif predict1 == 18:
+            crop_name = 'Pigeonpeas(कबूतर के मटर)'
+        elif predict1 == 19:
+            crop_name = 'Pomegranate(अनार)'
+        elif predict1 == 20:
+            crop_name = 'Rice(चावल)'
+        elif predict1 == 21:
+            crop_name = 'Watermelon(तरबूज)'
+
+        if float(humi) >=1 and float(humi)<= 33 : 
+            humidity_level = 'Low Humid'
+        elif float(humi) >=34 and float(humi) <= 66:
+            humidity_level = 'Medium Humid'
+        else:
+            humidity_level = 'High Humid'
+
+        if float(temp) >= 0 and float(temp)<= 6:
+            temperature_level = 'Cool'
+        elif float(temp) >=7 and float(temp):
+            temperature_level = 'Warm'
+        else:
+            temperature_level= 'Hot' 
+
+        if float(rainfall) >=1 and float(rainfall) <= 100:
+            rainfall_level = 'Less'
+        elif float(rainfall) >= 101 and float(rainfall) <=200:
+            rainfall_level = 'Moderate'
+        elif float(rainfall) >=201:
+            rainfall_level = 'Heavy Rain'
+
+        if float(N) >= 1 and float(N) <= 50: 
+            N_level = 'Less'
+        elif float(N) >=51 and float(N) <=100:
+            N_level = 'Not too less and Not to High'
+        elif float(N) >=101:
+            N_level = 'High'
+
+        if float(P) >= 1 and float(P) <= 50:
+            P_level = 'Less'
+        elif float(P) >= 51 and float(P) <=100:
+            P_level = 'Not too less and Not to High'
+        elif float(P) >=101:
+            P_level = 'High'
+
+        if float(K) >= 1 and float(K) <=50: 
+            potassium_level = 'Less'
+        elif float(K) >= 51 and float(K) <= 100:
+            potassium_level = 'Not too less and Not to High'
+        elif float(K) >=101:
+            potassium_level = 'High'
+
+        if float(ph) >=0 and float(ph) <=5:             
+            phlevel = 'Acidic' 
+        elif float(ph) >= 6 and float(ph) <= 8:
+            phlevel = 'Neutral'
+        elif float(ph) >= 9 and float(ph) <= 14:
+            phlevel = 'Alkaline'
+            
+        data=[[N,P,K,temp,humi,ph,rainfall,crop_name]] 
+        print(crop_name)   
+        
+        sheet.values().append(spreadsheetId=id,range="Crop_recommendation_project!A1:H1",valueInputOption="USER_ENTERED",insertDataOption="INSERT_ROWS",body={"values":data}).execute()
+        # return render_template("index.html",cont=[crop_name,humidity_level,temperature_level,rainfall_level,N_level,P_level,potassium_level,phlevel])
+        return render_template("Display.html",cont=[N_level,P_level,potassium_level,temperature_level,humidity_level,rainfall_level,phlevel],values=[N,P,K,humi,temp,rainfall,ph],cropName=crop_name,)
+
+    return render_template("index.html")
+
+@app.route("/user/<usr>")
+def user(usr):
+    return f"<h1> Hi {usr} !</h1>"
+
+if __name__=="__main__":
+   app.run(debug=True)
+  
+
+A.1.2 User interface (web view)
+
+<!-- {% extends "base.html" %}{%block content%}Details collection{% endblock%} {%block body%} -->
+
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            font-size: 62.5%;
+            box-sizing: border-box;
+        }
+
+        body {
+            /* height: 100vh; */
+            height: 100%;
+             /* background-image: url('agro.jpg');  */
+             background-color: rgb(139, 234, 164);
+            background-repeat: no-repeat;
+            background-size: contain;
+        }
+
+        @media screen and (max-width:750px) {
+            body {
+                background-size: cover;
+            }
+
+        }
+
+        h3 {
+            color: antiquewhite;
+            margin-left: 2rem;
+        }
+
+        h1 {
+            margin: 20px;
+            word-spacing: 10px;
+        }
+
+        .form {
+            margin-top: 15%;
+            margin-left: 40%;
+            padding: 30px;
+            width: 250px;
+            background-color: black;
+            border-radius: 9px;
+            position: absolute;
+
+        }
+
+        .box {
+            margin: 10px;
+            padding: 4px;
+            width: 200px;
+            border: 50px;
+            border-radius: 7px;
+        }
+
+        .button {
+            background: rgb(12, 123, 163);
+            width: auto;
+            margin: 2rem;
+            border: solid 1px orange;
+            color: white;
+            text-shadow: 0 1px 0 rgb(220, 150, 21);
+            transition: all 1s;
+            border-radius: 3px;
+        }
+
+        .button:hover {
+            box-shadow: 0 8px 16px 0 black, 0 6px 20px 0 rgba(0, 0, 0, 0.19);
+            padding: 1.2rem;
+            margin: 1.2rem;
+        }
+
+        .button:active {
+            border-color: rgb(20, 16, 14);
+        }
+
+        @media screen and (max-width:765px) {
+            .form {
+                width: max-content;
+                height: 500px;
+            }
+        }
+
+        /* Style the video: 100% width and height to cover the entire window */
+        #myVideo {
+            float: right;
+            right: 0;
+            bottom: 0;
+            height: 100%;
+            width: 100%;
+        }
+
+        /* Add some content at the bottom of the video/page */
+        .content {
+
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            color: #f1f1f1;
+            width: 100%;
+            padding: 20px;
+        }
+
+        /* Style the button used to pause/play the video */
+        #myBtn {
+            width: 200px;
+            font-size: 18px;
+            padding: 10px;
+            border: none;
+            background: #000;
+            color: #fff;
+            cursor: pointer;
+        }
+
+        #myBtn:hover {
+            background: #ddd;
+            color: black;
+        }
+    </style>
+
+</head>
+
+<body>
+    <!-- <aside>
+
+          
+          <div class="content">
+            <h1>Heading</h1>
+            <p>Lorem ipsum...</p>
+            <button id="myBtn" onclick="myFunction()">Pause</button>
+          </div>
+        </aside> -->
+    <video autoplay muted loop id="myVideo">
+        <source src="rain.mp4" type="video/mp4">
+    </video>
+    <div class="form">
+        <form action="/login" method="post">
+            <!-- Name:
+        <input type="text" name="nm" placeholer="Name" />
+        <p><input type="submit" value="submit" /></p> -->
+            <!-- <form action="#"> -->
+            <h1 style="color: orangered;">
+                <center>Submit Details</center>
+            </h1>
+            <h3>Nitrogen</h3>
+            </p><input type="number" step="any" min="1" max="200" name="Nitrogen" placeholder="Nitrogen in soil"
+                class="box" required />
+            <br />
+            <h3>Phosphorous</h3>
+            <input type="number" step="any" min="1" max="200" name="Phosphorous" placeholder="Phosphorous in soil"
+                class="box" required /><br />
+            <h3>Potassium</h3>
+            <input type="number" step="any" min="1" max="200" name="Potassium" placeholder="Potassium in soil"
+                class="box" required /><br />
+
+            <!-- <select name="PH" class="" id="selection">
+                <option value="Select">Select</option>
+                {%for i in range(1,15):%}
+                <option value=5>{{i}}</option>
+                {%endfor%}
+            </select> -->
+
+            <p><input type="submit" class="button" value=" Submit " /></p>
+        </form>
+    </div>
+
+    <!-- The video -->
+
+    <!-- {% endblock%} -->
+    <script>
+        // Get the video
+        var video = document.getElementById("myVideo");
+
+        // Get the button
+        var btn = document.getElementById("myBtn");
+
+        // Pause and play the video, and change the button text
+        function myFunction() {
+            if (video.paused) {
+                video.play();
+                btn.innerHTML = "Pause";
+            } else {
+                video.pause();
+                btn.innerHTML = "Play";
+            }
+        }
+    </script>
+</body>
+
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+A.1.3 LoRa receiver
+#include <LoRa.h>
+#include <SPI.h>
+ 
+#define ss 5
+#define rst 14
+#define dio0 2
+
+String currentTemperature;
+String currentHumidity; 
+void setup() 
+{
+  Serial.begin(115200);
+  while (!Serial);
+  Serial.println("LoRa Receiver");
+ 
+  LoRa.setPins(ss, rst, dio0);    //setup LoRa transceiver module
+ 
+  while (!LoRa.begin(433E6))     //433E6 - Asia, 866E6 - Europe, 915E6 - North America
+  {
+    Serial.println(".");
+    delay(500);
+  }
+  LoRa.setSyncWord(0xA5);
+  Serial.println("LoRa Initializing OK!");
+}
+ 
+void loop() 
+{
+  int packetSize = LoRa.parsePacket();    // try to parse packet
+  if (packetSize) 
+  {
+    
+    // Serial.print("Received packet '");
+ 
+    while (LoRa.available())              // read packet
+    {
+      // Serial.print("yes");
+      currentTemperature = LoRa.readStringUntil('|');
+      Serial.print("temp:");
+      Serial.println(currentTemperature);
+      currentHumidity = LoRa.readStringUntil('|');
+      Serial.print("humi:");
+      Serial.println(currentHumidity);
+      // delay(5000); 
+    }
+    Serial.print("' with RSSI ");         // print RSSI of packet
+    Serial.println(LoRa.packetRssi());
+  }
+}
+
+                                      
+ A.1.4 LoRa transmitter
+
+#include <SPI.h>
+#include <LoRa.h>
+#include <DHT.h>
+
+#define DHTPIN 4 
+float humi=0;
+float temp=0;
+DHT dht(DHTPIN, DHT11);
+
+int counter = 0;
+
+void setup() {
+  Serial.begin(115200);
+  dht.begin(); 
+  while (!Serial);
+
+  Serial.println("LoRa Sender");
+
+  if (!LoRa.begin(433E6)) {
+    Serial.println("Starting LoRa failed!");
+    while (1);
+  }
+  LoRa.setSyncWord(0xA5);
+  Serial.println("LoRa Initializing OK!");
+}
+
+void loop() {
+  int rainfall=analogRead(A0);
+  Serial.print("Sending packet: ");
+  humi = dht.readHumidity();
+  temp = dht.readTemperature();
+
+  // send packet
+  LoRa.beginPacket();
+  LoRa.print(temp);
+  LoRa.print("|");
+  LoRa.print(humi);
+  LoRa.print("|");
+  LoRa.print(rainfall);
+  LoRa.print("|");
+
+  LoRa.endPacket();
+
+  Serial.print("temp:");
+  Serial.print(temp);
+  Serial.println("humi:");
+  Serial.print(humi);
+  Serial.println("rainfall:");
+  Serial.println(rainfall);
+  
+
+  counter++;
+
+  delay(5000);
+}
